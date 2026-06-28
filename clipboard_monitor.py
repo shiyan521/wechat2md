@@ -1,25 +1,63 @@
 #!/usr/bin/env python3
 """
-微信收藏链接收集 — 实时抓取标题版
+微信收藏链接收集 — 实时抓取标题版（Mac / Windows 通用）
 用法: python3 clipboard_monitor.py
-- 监听剪贴板，每复制一篇链接立刻从网页抓取标题
-- 去重逻辑：按文章 /s/ 后的 ID 去重
+- 自动检测系统，使用对应剪贴板命令
+- 每复制一篇链接立刻从网页抓取标题
+- 去重：按文章 /s/ 后的 ID 去重
 - 结果保存为「### 标题\n链接」格式
+兼容: macOS, Windows, Linux / 纯 Python 3 标准库，零依赖
 """
-import subprocess, time, re, os, ssl, sys
+import subprocess, time, re, os, ssl, sys, platform
 import urllib.request, urllib.error
 import html as html_mod
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 OUTPUT = os.path.expanduser("~/Desktop/wechat_urls.txt")
+if platform.system() == 'Windows':
+    OUTPUT = os.path.join(os.path.expanduser("~"), "Desktop", "wechat_urls.txt")
+
 URL_RE = re.compile(r'https?://[^\s"\u4e00-\u9fff\uff00-\uffef]+')
+OS = platform.system()  # 'Darwin' (macOS) / 'Windows' / 'Linux'
+
+
+# ========== 剪贴板（跨平台） ==========
+
+def read_clipboard():
+    """读取系统剪贴板，Mac/Windows/Linux 自动适配"""
+    try:
+        if OS == 'Darwin':
+            # macOS
+            r = subprocess.run(['pbpaste'], capture_output=True, text=True, timeout=2)
+        elif OS == 'Windows':
+            # Windows
+            r = subprocess.run(
+                ['powershell', '-command', 'Get-Clipboard'],
+                capture_output=True, text=True, timeout=3,
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0,
+            )
+        else:
+            # Linux (xclip / wl-paste)
+            for cmd in (['wl-paste'], ['xclip', '-selection', 'clipboard', '-o']):
+                try:
+                    r = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
+                    if r.returncode == 0:
+                        break
+                except FileNotFoundError:
+                    continue
+            else:
+                return ""
+        return r.stdout.strip() if r.returncode == 0 else ""
+    except Exception:
+        return ""
+
 
 # ========== 标题抓取 ==========
 
 def fetch_title(url, timeout=8):
     """
     从微信文章页面抓取标题。
-    多重策略：og:title → msg_title JS变量 → <title> → rich_media_title → JSON data
+    多重策略：og:title → msg_title → <title> → activity-name → JSON data
     """
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -33,22 +71,16 @@ def fetch_title(url, timeout=8):
         })
         resp = urllib.request.urlopen(req, timeout=timeout, context=ctx)
         raw = resp.read().decode('utf-8', errors='replace')
-    except Exception as e:
+    except Exception:
         return None
 
-    # 多策略匹配（按可靠性排序）
     patterns = [
-        # 1. og:title — 最可靠
         (r'<meta[^>]*property="og:title"[^>]*content="([^"]+)"', False),
-        # 2. JS 变量 msg_title
         (r"var\s+msg_title\s*=\s*'([^']+)'", False),
         (r'var\s+msg_title\s*=\s*"([^"]+)"', False),
-        # 3. 网页 <title>
         (r'<title>([^<]+)</title>', False),
-        # 4. rich_media_title / activity-name
         (r'id="activity-name"[^>]*>\s*([^<]+)', True),
         (r'class="rich_media_title[^"]*"[^>]*>\s*([^<]+)', True),
-        # 5. JSON 内嵌 data
         (r'"title"\s*:\s*"([^"]+)"', False),
     ]
 
@@ -57,27 +89,22 @@ def fetch_title(url, timeout=8):
         m = re.search(pat, raw, flags)
         if m:
             title = html_mod.unescape(m.group(1).strip())
-            title = re.sub(r'<[^>]+>', '', title).strip()  # 去残留 HTML
-            title = re.sub(r'\s+', ' ', title)              # 合并空白
+            title = re.sub(r'<[^>]+>', '', title).strip()
+            title = re.sub(r'\s+', ' ', title)
             if len(title) >= 2:
                 return title
-
     return None
 
 
-# ========== 去重 & URL 清洗 ==========
+# ========== 去重 ==========
 
 def url_key(url):
-    """提取文章唯一 ID，用于去重"""
-    # 优先 /s/XXXXX 格式
     m = re.search(r'/s/([A-Za-z0-9_-]+)', url)
     if m:
         return m.group(1)
-    # 其次用 sn 参数
     m = re.search(r'[?&]sn=([A-Za-z0-9]+)', url)
     if m:
         return m.group(1)
-    # 最后用完整 URL（去掉分享参数）
     clean = re.sub(r'[?&](mpshare|scene|srcid|sharer_shareinfo|sharer_shareinfo_first)=[^&#]+', '', url)
     return clean.rstrip('#rd')
 
@@ -85,17 +112,15 @@ def url_key(url):
 # ========== 主流程 ==========
 
 def main():
-    # 清空输出文件
     with open(OUTPUT, 'w') as f:
         f.write('')
 
-    last = cb()
+    last = read_clipboard()
     seen = set()
-    entries = []  # [(title_or_None, url), ...]
-    fetch_failures = 0
+    entries = []
 
     print("=" * 55)
-    print("  微信收藏链接收集器（实时标题版）")
+    print(f"  微信收藏链接收集器（{OS} 版 · 实时标题）")
     print("=" * 55)
     print()
     print("  操作：微信收藏 → 右键文章 → 复制链接")
@@ -106,7 +131,7 @@ def main():
     try:
         while True:
             time.sleep(0.5)
-            cur = cb()
+            cur = read_clipboard()
             if cur == last or not cur:
                 continue
             last = cur
@@ -127,7 +152,6 @@ def main():
             seen.add(key)
             idx = len(entries) + 1
 
-            # 立刻抓标题
             print(f"  [{idx}] 获取标题...", end=' ', flush=True)
             title = None
             try:
@@ -140,26 +164,25 @@ def main():
             if title:
                 print(f"✅ {title}")
             else:
-                print(f"⚠️  未能获取标题（链接已保存，Ctrl+C 后重试）")
-                fetch_failures += 1
+                print(f"⚠️  未能获取标题（Ctrl+C 后重试）")
 
             entries.append((title, url))
 
     except KeyboardInterrupt:
         print()
-        print(f"  📄 共收集 {len(entries)} 篇文章")
+        print(f"  📄 共收集 {len(entries)} 篇")
         print()
 
         # 重试失败的标题
         retry_count = 0
         for i, (t, url) in enumerate(entries):
             if t is None:
-                print(f"  [{i+1}] 重试获取标题...", end=' ', flush=True)
+                print(f"  [{i+1}] 重试标题...", end=' ', flush=True)
                 try:
                     with ThreadPoolExecutor(max_workers=1) as ex:
                         future = ex.submit(fetch_title, url, 12)
                         t = future.result(timeout=15)
-                except (FuturesTimeoutError, Exception):
+                except Exception:
                     pass
                 if t:
                     entries[i] = (t, url)
@@ -189,14 +212,6 @@ def main():
             print(f"  ⚠️  {missing} 篇未能获取标题（链接已保存）")
         print(f"  📄 {OUTPUT}")
         print("=" * 55)
-
-
-def cb():
-    try:
-        r = subprocess.run(['pbpaste'], capture_output=True, text=True, timeout=2)
-        return r.stdout.strip()
-    except:
-        return ""
 
 
 if __name__ == '__main__':

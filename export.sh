@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  微信收藏文章 → Markdown 批量导出工具
+#  微信收藏文章 → Markdown 批量导出（Mac / Linux）
 # ============================================================
 #  用法:
 #    chmod +x export.sh
@@ -32,6 +32,7 @@ python3 "$DIR/download_markdown.py" "$URLS_FILE" "$OUT_DIR"
 
 echo ""
 echo "============================================"
-echo "  完成！Markdown 文件保存在:"
-echo "  $OUT_DIR"
+echo "  完成！"
+echo "  文件位置: $OUT_DIR"
+echo "  终端打开: open '$OUT_DIR'"
 echo "============================================"

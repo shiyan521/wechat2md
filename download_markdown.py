@@ -8,10 +8,12 @@
   - 标题+链接（### 标题\n链接）
 """
 
-import sys, os, re, ssl, time
+import sys, os, re, ssl, time, platform, subprocess
 import urllib.request
 import urllib.error
 import html as html_mod
+
+OS = platform.system()  # 'Darwin' / 'Windows' / 'Linux'
 
 def fetch_page(url, timeout=15):
     """抓取微信文章页面 HTML"""
@@ -178,10 +180,29 @@ def read_urls(filepath):
 
     return entries
 
+def open_folder(path):
+    """跨平台打开文件夹"""
+    try:
+        if OS == 'Darwin':
+            subprocess.run(['open', path])
+        elif OS == 'Windows':
+            os.startfile(path)
+        else:
+            subprocess.run(['xdg-open', path])
+    except Exception:
+        pass
+
 def main():
     if len(sys.argv) < 2:
         print("用法: python3 download_markdown.py <urls文件> [输出目录]")
-        print("示例: python3 download_markdown.py ~/Desktop/wechat_urls.txt ./wechat_md")
+        print()
+        if OS == 'Windows':
+            print("示例:")
+            print("  python download_markdown.py wechat_urls.txt")
+            print("  python download_markdown.py wechat_urls.txt .\\wechat_md")
+        else:
+            print("示例:")
+            print("  python3 download_markdown.py ~/Desktop/wechat_urls.txt ./wechat_md")
         sys.exit(1)
 
     urls_file = sys.argv[1]
@@ -261,7 +282,17 @@ def main():
 
     print()
     print(f"✅ 完成！成功 {success}/{total} 篇")
-    print(f"📂 保存至: {out_dir}")
+    print(f"📂 保存至: {os.path.abspath(out_dir)}")
+    print()
+    open_cmd = {'Darwin': 'open', 'Windows': 'start', 'Linux': 'xdg-open'}.get(OS, 'open')
+    print(f"💡 终端执行以下命令打开文件夹:")
+    if OS == 'Windows':
+        print(f"   start \"\" \"{os.path.abspath(out_dir)}\"")
+    else:
+        print(f"   {open_cmd} \"{os.path.abspath(out_dir)}\"")
+    print()
+    # 自动打开（可注释掉如果不需要）
+    open_folder(os.path.abspath(out_dir))
 
 if __name__ == '__main__':
     main()
