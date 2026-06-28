@@ -156,27 +156,31 @@ def sanitize_filename(name):
 
 def read_urls(filepath):
     """
-    读取 URL 列表，支持两种格式：
-    1. ### 标题\n链接  (clipboard_monitor 输出格式)
-    2. 纯链接（一行一个）
+    读取 URL 列表，支持混合格式（逐行解析，标题标记下一行的 URL）:
+    ### 标题
+    https://...
+    https://...  (无标题则用 None)
+    ### 另一个标题
+    https://...
     返回 [(title_or_None, url), ...]
     """
     entries = []
     with open(filepath) as f:
         content = f.read()
 
-    # 尝试解析标题+链接格式
-    title_url = re.findall(r'###\s*(.+?)\n\s*(https?://[^\s]+)', content)
-    if title_url:
-        for t, u in title_url:
-            entries.append((t.strip(), u.strip()))
-        return entries
-
-    # 纯链接格式
+    current_title = None
     for line in content.split('\n'):
         line = line.strip()
-        if line and line.startswith('http'):
-            entries.append((None, line))
+        if not line:
+            continue
+        if line.startswith('###'):
+            # 标题行：标记下一行 URL 的标题
+            current_title = line.lstrip('#').strip()
+            continue
+        if line.startswith('http'):
+            entries.append((current_title, line))
+            current_title = None  # 一个标题只绑定一条 URL
+            continue
 
     return entries
 
