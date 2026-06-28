@@ -30,28 +30,29 @@ def fetch_page(url, timeout=15):
         return resp.read().decode('utf-8', errors='replace')
 
 def extract_title(html_text):
-    """多策略提取文章标题"""
+    """多策略提取文章标题（与 clipboard_monitor 对齐）"""
     patterns = [
-        # 1. og:title (最可靠)
-        r'<meta[^>]*property="og:title"[^>]*content="([^"]+)"',
-        r"<meta[^>]*property='og:title'[^>]*content='([^']+)'",
-        # 2. twitter:title
-        r'<meta[^>]*name="twitter:title"[^>]*content="([^"]+)"',
-        # 3. JavaScript 变量
-        r'var\s+msg_title\s*=\s*[\'"]([^\'"]+)[\'"]',
-        r'var\s+title\s*=\s*[\'"]([^\'"]+)[\'"]',
-        # 4. rich_media_title h1
-        r'<h1[^>]*class="rich_media_title[^"]*"[^>]*>(.*?)</h1>',
-        r'id="activity-name"[^>]*>(.*?)<',
-        # 5. <title> 标签
-        r'<title>([^<]+)</title>',
+        # 1. og:title — 最可靠
+        (r'<meta[^>]*property="og:title"[^>]*content="([^"]+)"', False),
+        # 2. JS 变量 msg_title
+        (r"var\s+msg_title\s*=\s*'([^']+)'", False),
+        (r'var\s+msg_title\s*=\s*"([^"]+)"', False),
+        # 3. 网页 <title>
+        (r'<title>([^<]+)</title>', False),
+        # 4. rich_media_title / activity-name
+        (r'id="activity-name"[^>]*>\s*([^<]+)', True),
+        (r'class="rich_media_title[^"]*"[^>]*>\s*([^<]+)', True),
+        # 5. JSON 内嵌 data
+        (r'"title"\s*:\s*"([^"]+)"', False),
     ]
 
-    for pat in patterns:
-        m = re.search(pat, html_text, re.DOTALL)
+    for pat, is_dotall in patterns:
+        flags = re.DOTALL if is_dotall else 0
+        m = re.search(pat, html_text, flags)
         if m:
             title = html_mod.unescape(m.group(1).strip())
-            title = re.sub(r'<[^>]+>', '', title)
+            title = re.sub(r'<[^>]+>', '', title).strip()
+            title = re.sub(r'\s+', ' ', title)
             if len(title) > 2 and title != '微信公众平台':
                 return title
 
