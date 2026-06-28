@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# macOS
+.DS_Store
+
+# Output
+wechat_md/
+wechat_urls.txt
+
+# IDE
+.vscode/
+.idea/
