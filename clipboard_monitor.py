@@ -14,8 +14,17 @@ import html as html_mod
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
 OUTPUT = os.path.expanduser("~/Desktop/wechat_urls.txt")
-if platform.system() == 'Windows':
-    OUTPUT = os.path.join(os.path.expanduser("~"), "Desktop", "wechat_urls.txt")
+if OS == 'Windows':
+    OUTPUT = os.path.join(os.environ.get('USERPROFILE', os.path.expanduser('~')), 'Desktop', 'wechat_urls.txt')
+elif OS == 'Linux':
+    # Linux 桌面目录可能是 ~/Desktop 或 ~/桌面（中文 locale）
+    for d in ('~/Desktop', '~/桌面'):
+        candidate = os.path.expanduser(d)
+        if os.path.isdir(candidate):
+            OUTPUT = os.path.join(candidate, 'wechat_urls.txt')
+            break
+    else:
+        OUTPUT = os.path.expanduser('~/wechat_urls.txt')
 
 URL_RE = re.compile(r'https?://[^\s"\u4e00-\u9fff\uff00-\uffef]+')
 OS = platform.system()  # 'Darwin' (macOS) / 'Windows' / 'Linux'

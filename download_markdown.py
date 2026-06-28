@@ -196,6 +196,20 @@ def open_folder(path):
     except Exception:
         pass
 
+def default_out_dir():
+    """跨平台默认输出目录"""
+    if OS == 'Windows':
+        return os.path.join(os.environ.get('USERPROFILE', os.path.expanduser('~')), 'Desktop', 'wechat_md')
+    elif OS == 'Linux':
+        for d in ('~/Desktop', '~/桌面'):
+            candidate = os.path.expanduser(d)
+            if os.path.isdir(candidate):
+                return os.path.join(candidate, 'wechat_md')
+        return os.path.expanduser('~/wechat_md')
+    else:
+        return os.path.expanduser("~/Desktop/wechat_md")
+
+
 def main():
     if len(sys.argv) < 2:
         print("用法: python3 download_markdown.py <urls文件> [输出目录]")
@@ -210,7 +224,7 @@ def main():
         sys.exit(1)
 
     urls_file = sys.argv[1]
-    out_dir = sys.argv[2] if len(sys.argv) > 2 else os.path.expanduser("~/Desktop/wechat_md")
+    out_dir = sys.argv[2] if len(sys.argv) > 2 else default_out_dir()
 
     if not os.path.exists(urls_file):
         print(f"❌ 文件不存在: {urls_file}")

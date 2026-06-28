@@ -65,5 +65,9 @@ echo "  完成！"
 echo "  文件位置: $OUT_DIR"
 echo "============================================"
 
-# 自动打开文件夹
-open "$OUT_DIR" 2>/dev/null || echo "  终端打开: open '$OUT_DIR'"
+# 自动打开文件夹（跨平台）
+case "$(uname)" in
+    Darwin) open "$OUT_DIR" ;;
+    Linux)  xdg-open "$OUT_DIR" 2>/dev/null || echo "  终端打开: xdg-open '$OUT_DIR'" ;;
+    *)      echo "  打开文件夹: $OUT_DIR" ;;
+esac
