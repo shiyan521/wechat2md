@@ -13,6 +13,8 @@ import urllib.request, urllib.error
 import html as html_mod
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 
+OS = platform.system()  # 'Darwin' (macOS) / 'Windows' / 'Linux'
+
 OUTPUT = os.path.expanduser("~/Desktop/wechat_urls.txt")
 if OS == 'Windows':
     OUTPUT = os.path.join(os.environ.get('USERPROFILE', os.path.expanduser('~')), 'Desktop', 'wechat_urls.txt')
@@ -27,7 +29,6 @@ elif OS == 'Linux':
         OUTPUT = os.path.expanduser('~/wechat_urls.txt')
 
 URL_RE = re.compile(r'https?://[^\s"\u4e00-\u9fff\uff00-\uffef]+')
-OS = platform.system()  # 'Darwin' (macOS) / 'Windows' / 'Linux'
 
 
 # ========== 剪贴板（跨平台） ==========
