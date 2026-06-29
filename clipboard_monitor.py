@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-微信收藏链接收集 — 实时抓取标题版（Mac / Windows 通用）
+微信收藏链接收集 — 实时抓取标题版（Mac / Windows / Linux 通用）
 用法: python3 clipboard_monitor.py
 - 自动检测系统，使用对应剪贴板命令
 - 每复制一篇链接立刻从网页抓取标题
@@ -15,11 +15,11 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 
 OS = platform.system()  # 'Darwin' (macOS) / 'Windows' / 'Linux'
 
+# 跨平台桌面路径（Linux 中文 locale 可能是 ~/桌面）
 OUTPUT = os.path.expanduser("~/Desktop/wechat_urls.txt")
 if OS == 'Windows':
     OUTPUT = os.path.join(os.environ.get('USERPROFILE', os.path.expanduser('~')), 'Desktop', 'wechat_urls.txt')
 elif OS == 'Linux':
-    # Linux 桌面目录可能是 ~/Desktop 或 ~/桌面（中文 locale）
     for d in ('~/Desktop', '~/桌面'):
         candidate = os.path.expanduser(d)
         if os.path.isdir(candidate):
@@ -37,17 +37,15 @@ def read_clipboard():
     """读取系统剪贴板，Mac/Windows/Linux 自动适配"""
     try:
         if OS == 'Darwin':
-            # macOS
             r = subprocess.run(['pbpaste'], capture_output=True, text=True, timeout=2)
         elif OS == 'Windows':
-            # Windows
             r = subprocess.run(
                 ['powershell', '-command', 'Get-Clipboard'],
                 capture_output=True, text=True, timeout=3,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0,
             )
         else:
-            # Linux (xclip / wl-paste)
+            # Linux (wl-paste / xclip)
             for cmd in (['wl-paste'], ['xclip', '-selection', 'clipboard', '-o']):
                 try:
                     r = subprocess.run(cmd, capture_output=True, text=True, timeout=2)
@@ -152,7 +150,7 @@ def main():
                 print(f"  ⚠️  非链接: {preview}")
                 continue
 
-            url = m.group(0).rstrip('"\'.。，,;；')
+            url = m.group(0).rstrip('"\'。，,;；')
             key = url_key(url)
 
             if key in seen:
